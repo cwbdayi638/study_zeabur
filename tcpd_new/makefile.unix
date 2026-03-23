@@ -1,0 +1,78 @@
+
+#
+#
+#    $Id: makefile.ux,v 1.3 2007/12/16 19:44:56 paulf Exp $
+#
+#    Revision history:
+#     $Log: makefile.ux,v $
+#     Revision 1.3  2007/12/16 19:44:56  paulf
+#     unix makefile improvements for cflags and cc vars
+#
+#     Revision 1.2  2007/02/20 16:01:07  stefan
+#     lockfile.o
+#
+#     Revision 1.1  2005/07/26 20:58:04  friberg
+#     added UNIX makefile
+#
+#
+
+LINUX_FLAGS=-lpthread -fstack-check -Wall -lm 
+SOLARIS_FLAGS=-mt -lposix4 -lthread -lpthread -lsocket -lnsl -lm
+SPECIFIC_FLAGS=$($(PLATFORM)_FLAGS)
+
+LINUX_CFLAGS=-Wall 
+SOLARIS_CFLAGS=
+SPECIFIC_CFLAGS=$($(PLATFORM)_CFLAGS)
+
+CFLAGS = -D_REENTRANT $(GLOBALFLAGS) $(SPECIFIC_CFLAGS)
+
+CFLAGS += -g
+
+
+
+
+
+#CFLAGS=${GLOBALFLAGS} -g
+#LIBS=-lm -lpthread
+
+APP = tcpd_new
+B = $(EW_HOME)/$(EW_VERSION)/bin
+L = $(EW_HOME)/$(EW_VERSION)/lib
+
+
+EW_LIBS = \
+        $L/swap.o \
+        $L/trheadconv.o \
+        -L$L -lew_mt
+
+
+BINARIES = tcpd_new.o $L/kom.o $L/getutil.o $L/sleep_ew.o \
+           $L/time_ew.o $L/transport.o  $L/lockfile_ew.o $L/lockfile.o 
+
+
+
+HEADERS = 
+
+all: dynamic
+
+dynamic: $B/$(APP)
+
+static: $(BINARIES) $(HEADERS)
+	$(CC) -o tcpd_new $(CFLAGS) $(LDFLAGS) $(BINARIES)  $(SPECIFIC_FLAGS)  $(EW_LIBS)
+
+$B/$(APP): $(BINARIES) $(HEADERS)
+	$(CC) -o tcpd_new $(CFLAGS) $(LDFLAGS) $(BINARIES) $(SPECIFIC_FLAGS)  $(EW_LIBS)
+
+.c.o:
+	$(CC) -c $(CFLAGS)  $<
+
+
+lint:
+	lint tcpd_new.c $(GLOBALFLAGS)
+
+# Clean-up rules
+clean:
+	rm -f a.out core *.o
+
+clean_bin:
+	rm -f $B/$(APP)
