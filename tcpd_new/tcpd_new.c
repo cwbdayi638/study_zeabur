@@ -137,10 +137,10 @@ static char  Text[150];        /* string for log/error messages          */
 	int rep_fin=0;
 	
 
-int G_Q, G_n, pre_G_n=-1, G_sta_num, G_n_mag, pre_G_sta_num=-1, pre_G_n_mag;
-double pre_proc_time, proc_time;
-double G_averr, G_con[10], G_x[10], G_y[10], G_z[10], G_t[10];
-double GAP, pre_GAP=-1.0;
+int G_Q=0, G_n=0, pre_G_n=-1, G_sta_num=0, G_n_mag=0, pre_G_sta_num=-1, pre_G_n_mag=0;
+double pre_proc_time=0.0, proc_time=0.0;
+double G_averr=0.0, G_con[10], G_x[10], G_y[10], G_z[10], G_t[10];
+double GAP=0.0, pre_GAP=-1.0;
 
 FILE *faa;
 int num_eew=0;
@@ -453,6 +453,10 @@ int main( int argc, char **argv )
 						sprintf(ptr[j].stn_Loc ,"%s",out_ss[3]);
  			
 						upd_sec = atoi(out_ss[13]);
+						if(upd_sec < 0 || upd_sec > 14) {
+							logit("e", "tcpd: Invalid upd_sec=%d from %s, skipping\n", upd_sec, out_ss[0]);
+							break;
+						}
 			
 						ptr[j].longitude    = atof(out_ss[4]);
 						ptr[j].latitude     = atof(out_ss[5]);
@@ -520,7 +524,7 @@ int main( int argc, char **argv )
                                   	      !strcmp( ptr[i].stn_Comp, ptr[k].stn_Comp ) &&
                                   	      !strcmp( ptr[i].stn_Net , ptr[k].stn_Net  ) &&
                                   	      !strcmp( ptr[i].stn_Loc , ptr[k].stn_Loc  ) &&
-										           ptr[i].P == ptr[k].P
+										           fabs(ptr[i].P - ptr[k].P) < 1e-6
                                   	)                                      	
 									  if( ptr[i].upd_sec > ptr[k].upd_sec)
 										{										
@@ -553,6 +557,10 @@ int main( int argc, char **argv )
 						sum_ptime += ptr[i].P;
 						num_tt++;
 					}
+				}
+				if(num_tt <= 0) {
+					sleep_ew(100);
+					continue;
 				}
 				avg_lon = sum_lon / (float)num_tt;
 				avg_lat = sum_lat / (float)num_tt;
@@ -814,22 +822,22 @@ void tcpd_config( char *configfile )
             }
   /*1*/     else if( k_its("MyModuleId") ) {
                 str = k_str();
-                if(str) strcpy( MyModName, str );
+                if(str) { strncpy(MyModName, str, MAX_MOD_STR-1); MyModName[MAX_MOD_STR-1]='\0'; }
                 init[1] = 1;
             }
   /*2*/     else if( k_its("RingName") ) {
                 str = k_str();
-                if(str) strcpy( RingName, str );
+                if(str) { strncpy(RingName, str, MAX_RING_STR-1); RingName[MAX_RING_STR-1]='\0'; }
                 init[2] = 1;
             }
   /*2*/     else if( k_its("RingName_out") ) {
                 str = k_str();
-                if(str) strcpy( RingName_out, str );
+                if(str) { strncpy(RingName_out, str, MAX_RING_STR-1); RingName_out[MAX_RING_STR-1]='\0'; }
                 init[2] = 1;
             }     
   /*2*/     else if( k_its("Mark") ) {
                 str = k_str();
-                if(str) strcpy( Mark, str );
+                if(str) { strncpy(Mark, str, sizeof(Mark)-1); Mark[sizeof(Mark)-1]='\0'; }
                 init[2] = 1;
             }    						
   /*3*/     else if( k_its("HeartBeatInterval") ) {
@@ -921,14 +929,22 @@ void tcpd_config( char *configfile )
 			    return;
 			}
 
-			if ((str = k_str ()))  
-			    strcpy (MagReject[num_mag_reject].sta, str);
-			if ((str = k_str()))  
-			    strcpy (MagReject[num_mag_reject].chn, str);
-			if ((str = k_str()))  
-			    strcpy (MagReject[num_mag_reject].net, str);
-			if ((str = k_str()))  
-			    strcpy (MagReject[num_mag_reject].loc, str);
+			if ((str = k_str ())) {
+			    strncpy(MagReject[num_mag_reject].sta, str, sizeof(MagReject[0].sta)-1);
+			    MagReject[num_mag_reject].sta[sizeof(MagReject[0].sta)-1] = '\0';
+			}
+			if ((str = k_str())) {
+			    strncpy(MagReject[num_mag_reject].chn, str, sizeof(MagReject[0].chn)-1);
+			    MagReject[num_mag_reject].chn[sizeof(MagReject[0].chn)-1] = '\0';
+			}
+			if ((str = k_str())) {
+			    strncpy(MagReject[num_mag_reject].net, str, sizeof(MagReject[0].net)-1);
+			    MagReject[num_mag_reject].net[sizeof(MagReject[0].net)-1] = '\0';
+			}
+			if ((str = k_str())) {
+			    strncpy(MagReject[num_mag_reject].loc, str, sizeof(MagReject[0].loc)-1);
+			    MagReject[num_mag_reject].loc[sizeof(MagReject[0].loc)-1] = '\0';
+			}
 			num_mag_reject++;
 	  }                     
                                                   
@@ -2019,8 +2035,9 @@ void Magnitude( PEEW *vsn_ntri, int qtrigger, HYP hyp, MAG *mag, double *pPgv, i
 	G_n_mag = mpd.new_num;
 	
 	mag->xMpd = 0.0;
-	for(i=0;i<mpd.new_num;i++)
-		mag->xMpd += (zMpd[i].wei/sum_wei)*zMpd[i].mag;
+	if(sum_wei > 0.0)
+		for(i=0;i<mpd.new_num;i++)
+			mag->xMpd += (zMpd[i].wei/sum_wei)*zMpd[i].mag;
 
 //----------------------------------------------------------- Mtc
 	sum_wei	= 0.0;
@@ -2042,8 +2059,9 @@ void Magnitude( PEEW *vsn_ntri, int qtrigger, HYP hyp, MAG *mag, double *pPgv, i
 	}
 		// printf("-----------a6 \n");
 	mag->mtc = 0.0;
-	for(i=0;i<mtc.new_num;i++)
-		mag->mtc += (zMtc[i].wei/sum_wei)*zMtc[i].mag;
+	if(sum_wei > 0.0)
+		for(i=0;i<mtc.new_num;i++)
+			mag->mtc += (zMtc[i].wei/sum_wei)*zMtc[i].mag;
 
 
 	
@@ -2081,9 +2099,13 @@ void Magnitude( PEEW *vsn_ntri, int qtrigger, HYP hyp, MAG *mag, double *pPgv, i
 	
 	Theo_pa_ratio = (double*) malloc(1000*sizeof(double));
 	Padj_wei = (double*) malloc(1000*sizeof(double));
-	
 	zTheo_pa_ratio = (double*) malloc(1000*sizeof(double));
-	zPadj_wei = (double*) malloc(1000*sizeof(double));	
+	zPadj_wei = (double*) malloc(1000*sizeof(double));
+	if(!Theo_pa_ratio || !Padj_wei || !zTheo_pa_ratio || !zPadj_wei) {
+		logit("e", "tcpd: Magnitude() malloc failed for Padj arrays\n");
+		free(Theo_pa_ratio); free(Padj_wei); free(zTheo_pa_ratio); free(zPadj_wei);
+		return;
+	}
 //------------------------------------------------------------ pa--->Padj
 	dd=0;
    for(k=0;k<qtrigger;k++)
@@ -2145,8 +2167,9 @@ void Magnitude( PEEW *vsn_ntri, int qtrigger, HYP hyp, MAG *mag, double *pPgv, i
 
 			// printf("--------w3\n");
 	Padj = 0.0;
-	for(i=0;i<bb;i++)
-		Padj += (zPadj_wei[i]/Padj_sum_wei)*zTheo_pa_ratio[i];
+	if(Padj_sum_wei > 0.0)
+		for(i=0;i<bb;i++)
+			Padj += (zPadj_wei[i]/Padj_sum_wei)*zTheo_pa_ratio[i];
 			// printf("--------e3\n");
 	free(Theo_pa_ratio);
 	free(Padj_wei);	
@@ -2815,7 +2838,6 @@ void cal_avg_std1(double *data, int num, double *avg, double *std)
 		
 		aavg = ssum / (double)cc;
 		
-		printf("ssum: %f, num: %d, aavg: %f \n", ssum, num, aavg);
 		
 		for(i=0;i<cc;i++)
 				sum_dev += pow(      (data[i] - aavg) ,   2  );
