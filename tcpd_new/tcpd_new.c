@@ -1388,30 +1388,26 @@ void locaeq(PEEW *ptr,int nsta, HYP *hyp)
             y0=y0+c[1]/dlat;
             z0=z0+c[2];
             t0=t0+c[3];
-            //G_con[itr] = fabs(c[0])+fabs(c[1])+fabs(c[2])+fabs(c[3]);
-            //G_x[itr]=fabs(c[0]);
-            //G_y[itr]=fabs(c[1]);
-            //G_z[itr]=fabs(c[2]);
-            //G_t[itr]=fabs(c[3]);
-            
-            if( (fabs(c[0])+fabs(c[1])+fabs(c[2])+fabs(c[3]) ) < 60.0)
-			{
-				// printf("Q--- %f \n", (fabs(c[0])+fabs(c[1])+fabs(c[2])+fabs(c[3])) );
-				// iq++;   
-			}
-			else 
-			{
-				iq--;
-				// printf("Q--- %f \n", (fabs(c[0])+fabs(c[1])+fabs(c[2])+fabs(c[3])) );
-			}
-            
-            
-              if(fabs(t0-t_ini) > 60.0 || errsum>6.0){        
-                t0=t_ini;                                 
+
+            /* Adaptive convergence: break early if correction is small enough */
+            {
+                double step_km = sqrt(c[0]*c[0] + c[1]*c[1] + c[2]*c[2]);
+                double step_t  = fabs(c[3]);
+                if(step_km < 0.1 && step_t < 0.01)
+                {
+                    logit("t", "tcpd: locaeq converged at iter %d (step=%.3fkm dt=%.4fs)\n",
+                          itr, step_km, step_t);
+                    break;
+                }
+                if( (fabs(c[0])+fabs(c[1])+fabs(c[2])+fabs(c[3])) >= 60.0 )
+                    iq--;
+            }
+
+              if(fabs(t0-t_ini) > 60.0 || errsum>6.0){
+                t0=t_ini;
                 x0=x_ini;
                 y0=y_ini;
                 z0=z_ini;
-               // iq--;
               }
   }	// iteration
   //-------------------------------------------------- Grid Search for Determining Depth
